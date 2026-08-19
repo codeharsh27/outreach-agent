@@ -57,132 +57,173 @@ def format_draft_message(draft: dict) -> str:
 
 
 def approval_keyboard(draft_id: int) -> InlineKeyboardMarkup:
-    """Inline keyboard: Approve / Skip."""
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Approve & Send Email", callback_data=f"approve:{draft_id}"),
-        InlineKeyboardButton("❌ Skip", callback_data=f"skip:{draft_id}"),
-    ]])
+    """Inline keyboard: Approve / Edit / Skip."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Approve & Send Email", callback_data=f"approve:{draft_id}"),
+            InlineKeyboardButton("✏️ Edit Email", callback_data=f"edit:{draft_id}"),
+        ],
+        [
+            InlineKeyboardButton("❌ Skip Draft", callback_data=f"skip:{draft_id}")
+        ]
+    ])
 
 
-# ── Async send + wait for approval ───────────────────────────────
+# ── Interactive Telegram Edit & Approval Handler ────────────────
 
-async def send_batch_for_approval(drafts: list) -> list:
+async def push_all_drafts_to_telegram():
     """
-    Send up to 5 drafts to Telegram, wait for approval/skip on each.
-    Returns list of approved draft IDs.
+    Push ALL pending draft cards to Telegram chat in one smooth stream.
+    Adds inline buttons [✅ Approve], [✏️ Edit], [❌ Skip] to every card.
     """
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    approved_ids = []
-    pending_msg_ids = {}  # draft_id → telegram message_id
+    drafts = get_pending_drafts(limit=50)
 
-    # Send all drafts in the batch
+    if not drafts:
+        print("   No pending drafts to push to Telegram.")
+        return []
+
+    print(f"   Pushing {len(drafts)} drafts to Telegram app...")
     await bot.send_message(
         chat_id=TELEGRAM_CHAT_ID,
-        text=f"📬 <b>{len(drafts)} new outreach drafts ready for review</b>",
+        text=f"🌅 <b>Good morning! {len(drafts)} outreach drafts ready for review</b>\nTap <b>[✅ Approve]</b> to queue email, <b>[✏️ Edit]</b> to customize, or <b>[❌ Skip]</b>.",
         parse_mode="HTML"
     )
 
+    sent_count = 0
     for draft in drafts:
+        draft = dict(draft)
         draft_id = draft["id"]
-        msg_text = format_draft_message(dict(draft))
+        msg_text = format_draft_message(draft)
 
-        msg = await bot.send_message(
-            chat_id=TELEGRAM_CHAT_ID,
-            text=msg_text,
-            parse_mode="HTML",
-            reply_markup=approval_keyboard(draft_id),
-            disable_web_page_preview=True,
-        )
-        pending_msg_ids[draft_id] = msg.message_id
-        update_draft_status(draft_id, "pending", str(msg.message_id))
-        await asyncio.sleep(0.5)
-
-    # Poll for responses (max 10 minutes per batch)
-    print(f"   Waiting for Telegram approval (10 min timeout)...")
-    deadline = time.time() + 600
-    decided = set()
-
-    while len(decided) < len(drafts) and time.time() < deadline:
         try:
-            updates = await bot.get_updates(timeout=10, offset=-1)
-            for update in updates:
-                if not update.callback_query:
-                    continue
-                cb = update.callback_query
-                data = cb.data or ""
-
-                if ":" not in data:
-                    continue
-                action, draft_id_str = data.split(":", 1)
-                draft_id = int(draft_id_str)
-
-                if draft_id in decided:
-                    continue
-                decided.add(draft_id)
-
-                if action == "approve":
-                    update_draft_status(draft_id, "approved")
-                    approved_ids.append(draft_id)
-                    await cb.answer("✅ Approved!")
-                    await bot.edit_message_reply_markup(
-                        chat_id=TELEGRAM_CHAT_ID,
-                        message_id=pending_msg_ids[draft_id],
-                        reply_markup=None
-                    )
-                    await bot.send_message(
-                        chat_id=TELEGRAM_CHAT_ID,
-                        text=f"✅ Approved → queued for send"
-                    )
-                elif action == "skip":
-                    update_draft_status(draft_id, "skipped")
-                    await cb.answer("Skipped")
-                    await bot.edit_message_reply_markup(
-                        chat_id=TELEGRAM_CHAT_ID,
-                        message_id=pending_msg_ids[draft_id],
-                        reply_markup=None
-                    )
-
+            msg = await bot.send_message(
+                chat_id=TELEGRAM_CHAT_ID,
+                text=msg_text,
+                parse_mode="HTML",
+                reply_markup=approval_keyboard(draft_id),
+                disable_web_page_preview=True,
+            )
+            update_draft_status(draft_id, "pending", str(msg.message_id))
+            sent_count += 1
+            await asyncio.sleep(0.4)  # Smooth rate-limited stream
         except Exception as e:
-            print(f"   [Telegram poll] {e}")
-            await asyncio.sleep(5)
+            print(f"   [Telegram push ({draft.get('company_name')})] Error: {e}")
 
-    # Auto-skip anything not decided
-    for draft in drafts:
-        if draft["id"] not in decided:
-            update_draft_status(draft["id"], "skipped")
+    print(f"✅ Pushed {sent_count} draft cards to Telegram!")
+    return drafts
 
-    return approved_ids
+
+# ── Interactive Callback & Text Handler for Editing ──────────────
+
+def update_draft_body(draft_id: int, new_body: str):
+    """Update email_body for a draft in the database."""
+    conn = sqlite3.connect(str(TRACKER_DB))
+    try:
+        conn.execute("UPDATE drafts SET email_body=? WHERE id=?", (new_body, draft_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_draft_by_id(draft_id: int) -> dict | None:
+    """Fetch single draft by ID with company and contact info."""
+    conn = sqlite3.connect(str(TRACKER_DB))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute("""
+            SELECT d.*, co.name as company_name, co.domain,
+                   ct.name as contact_name, ct.email, ct.linkedin_url, ct.twitter_url
+            FROM drafts d
+            JOIN companies co ON co.id = d.company_id
+            JOIN contacts  ct ON ct.id = d.contact_id
+            WHERE d.id = ?
+        """, (draft_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle button clicks: approve, edit, skip."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data or ""
+    if ":" not in data:
+        return
+    action, draft_id_str = data.split(":", 1)
+    draft_id = int(draft_id_str)
+
+    if action == "approve":
+        update_draft_status(draft_id, "approved")
+        await query.edit_message_reply_markup(reply_markup=None)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"✅ <b>Approved!</b> Queued for timezone-aware Gmail dispatch.",
+            parse_mode="HTML"
+        )
+    elif action == "skip":
+        update_draft_status(draft_id, "skipped")
+        await query.edit_message_reply_markup(reply_markup=None)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"❌ Draft skipped.",
+            parse_mode="HTML"
+        )
+    elif action == "edit":
+        # Store draft ID in user_data for editing
+        context.user_data["editing_draft_id"] = draft_id
+        context.user_data["editing_msg_id"] = query.message.message_id
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"✏️ <b>Editing Draft #{draft_id}</b>\nPlease reply to this message with your new email text:",
+            parse_mode="HTML"
+        )
+
+
+async def handle_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle text reply when user provides edited email text."""
+    draft_id = context.user_data.get("editing_draft_id")
+    orig_msg_id = context.user_data.get("editing_msg_id")
+
+    if not draft_id or not update.message or not update.message.text:
+        return
+
+    new_text = update.message.text.strip()
+    update_draft_body(draft_id, new_text)
+
+    # Fetch updated draft and update original card
+    updated_draft = get_draft_by_id(draft_id)
+    if updated_draft and orig_msg_id:
+        try:
+            await context.bot.edit_message_text(
+                chat_id=update.message.chat_id,
+                message_id=orig_msg_id,
+                text=format_draft_message(updated_draft),
+                parse_mode="HTML",
+                reply_markup=approval_keyboard(draft_id),
+                disable_web_page_preview=True,
+            )
+        except Exception as e:
+            print(f"Edit update error: {e}")
+
+    await update.message.reply_text("✅ Draft updated! Review card above and tap [✅ Approve & Send Email].")
+    context.user_data.clear()
 
 
 # ── Main approval run ─────────────────────────────────────────────
 
 def run() -> list:
-    """
-    Send all pending drafts to Telegram in batches of 5.
-    Returns list of approved draft IDs.
-    """
-    print("\n📱 Running Telegram approval gate...")
-    drafts = get_pending_drafts()
+    """Push all draft cards to Telegram immediately."""
+    print("\n📱 Running Telegram approval push...")
+    asyncio.run(push_all_drafts_to_telegram())
 
-    if not drafts:
-        print("   No pending drafts to review")
-        return []
-
-    print(f"   {len(drafts)} drafts to review")
-
-    approved = []
-    # Process in batches of 5
-    for i in range(0, len(drafts), 5):
-        batch = list(drafts[i:i+5])
-        print(f"\n   Sending batch {i//5 + 1} ({len(batch)} drafts)...")
-        batch_approved = asyncio.run(send_batch_for_approval(batch))
-        approved.extend(batch_approved)
-        if i + 5 < len(drafts):
-            print("   Waiting 30s before next batch...")
-            time.sleep(30)
-
-    print(f"\n✅ Approval complete: {len(approved)}/{len(drafts)} approved")
-    return approved
+    # Return list of currently approved draft IDs ready to send
+    conn = sqlite3.connect(str(TRACKER_DB))
+    approved_ids = [r[0] for r in conn.execute("SELECT id FROM drafts WHERE status='approved'").fetchall()]
+    conn.close()
+    return approved_ids
 
 
 if __name__ == "__main__":
