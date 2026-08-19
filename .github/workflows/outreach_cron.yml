@@ -1,0 +1,37 @@
+name: Automated Daily Outreach Pipeline
+
+on:
+  schedule:
+    # Run every Monday through Friday at 08:00 AM UTC
+    - cron: '0 8 * * 1-5'
+  workflow_dispatch: # Allows manual trigger from GitHub UI anytime
+
+jobs:
+  outreach:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install httpx requests beautifulsoup4 PyGithub python-dotenv google-auth google-auth-oauthlib google-api-python-client openai aiohttp sqlite-utils pytz python-telegram-bot dnspython
+
+      - name: Run Outreach Pipeline & Push Live Telegram Cards
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GMAIL_SENDER_EMAIL: ${{ secrets.GMAIL_SENDER_EMAIL }}
+        run: |
+          python3 -m agents.orchestrate run

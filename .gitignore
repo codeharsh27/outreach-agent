@@ -1,0 +1,16 @@
+# Ignore secrets and generated data
+.env
+config/gmail_credentials.json
+config/token.json
+data/tracker/*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
