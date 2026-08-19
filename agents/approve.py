@@ -12,18 +12,20 @@ from agents.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRACKER_DB
 from agents.tracker import get_pending_drafts, update_draft_status
 
 
+import html
+
 # ── Format a draft message for Telegram ──────────────────────────
 
 def format_draft_message(draft: dict) -> str:
     """Format a draft into a readable Telegram message with separated sections."""
-    company = draft.get("company_name", "Unknown")
-    contact = draft.get("contact_name", "Unknown")
-    email = draft.get("email", "")
-    domain = draft.get("domain", "")
-    subject = draft.get("email_subject", "")
-    body = draft.get("email_body", "")
-    linkedin = draft.get("linkedin_msg", "")
-    x_reply = draft.get("x_reply_text", "")
+    company = html.escape(str(draft.get("company_name", "Unknown")))
+    contact = html.escape(str(draft.get("contact_name", "Unknown")))
+    email = html.escape(str(draft.get("email", "")))
+    domain = html.escape(str(draft.get("domain", "")))
+    subject = html.escape(str(draft.get("email_subject", "")))
+    body = html.escape(str(draft.get("email_body", "")))
+    linkedin = html.escape(str(draft.get("linkedin_msg", "")))
+    x_reply = html.escape(str(draft.get("x_reply_text", "")))
     x_url = draft.get("x_reply_url", "")
 
     header = f"🏢 <b>{company}</b>  ·  {contact}\n📧 {email}" + (f"  ·  {domain}" if domain else "")
