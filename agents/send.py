@@ -96,7 +96,12 @@ def build_email(to: str, subject: str, body: str, signature_html: str = "") -> d
 
     html_body_content = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', body)
     paragraphs = html_body_content.strip().split("\n\n")
-    html_paragraphs = "".join(f"<p>{p.replace('\n', '<br>')}</p>" for p in paragraphs if p.strip())
+    html_paragraphs_list = []
+    for p in paragraphs:
+        if p.strip():
+            p_clean = p.replace("\n", "<br>")
+            html_paragraphs_list.append(f"<p>{p_clean}</p>")
+    html_paragraphs = "".join(html_paragraphs_list)
 
     if signature_html:
         html_content = f"<div>{html_paragraphs}</div><br><div>{signature_html}</div>"
