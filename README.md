@@ -1,132 +1,279 @@
-# Outreach Agent 🛰️
+# Outreach Agent
 
 <p align="center">
-  <a href="https://github.com/codeharsh27/outreach-agent"><img src="https://img.shields.io/badge/Docs-outreach--agent.github.io-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://t.me/BotFather"><img src="https://img.shields.io/badge/Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Bot"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://github.com/codeharsh27"><img src="https://img.shields.io/badge/Built%20by-Harsh%20Mule-blueviolet?style=for-the-badge" alt="Built by Harsh Mule"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License: MIT"></a>
+  <a href="https://github.com/codeharsh27/outreach-agent"><img src="https://img.shields.io/badge/Built%20by-Harsh%20Mule-6e40c9?style=flat-square" alt="Built by Harsh Mule"></a>
+  <a href="https://supabase.com"><img src="https://img.shields.io/badge/Database-Supabase-3ecf8e?style=flat-square" alt="Supabase"></a>
+  <a href="https://aistudio.google.com"><img src="https://img.shields.io/badge/LLM-Gemini%20Flash-4285F4?style=flat-square" alt="Gemini Flash"></a>
+  <img src="https://img.shields.io/badge/Platform-GitHub%20Actions-2088FF?style=flat-square" alt="GitHub Actions">
 </p>
 
-**The autonomous, sub-second outreach & lead discovery agent.** Designed for high-velocity software engineers seeking job and contract opportunities at YC, VC-backed, and top Indian tech startups. It discovers high-fit companies, performs 3-layer light technical research in 0.1s, generates human-toned outreach with **Google Gemini 3.6 Flash (< 300ms)**, and delivers interactive review cards to your Telegram app with live editing controls.
+An autonomous outreach agent for software engineers. Discovers high-fit startups, finds contacts, generates personalized cold emails using Gemini Flash, and delivers interactive review cards to Telegram every morning. Approve, edit, or skip — then emails go out via Gmail during recipient business hours.
 
-Run it on a $5 cloud VPS, local WSL2, or **100% serverless via GitHub Actions**. It's not tied to your laptop — review and approve cards from your phone over morning coffee.
-
----
-
-<table>
-<tr><td><b>24-Hour Staggered Pipeline</b></td><td>Continuous background micro-batches (2 PM, 6 PM, 10 PM) discover startups, perform light research, and find contacts without API rate limits.</td></tr>
-<tr><td><b>Sub-Second LLM Drafting</b></td><td>Powered by Google Gemini 3.6 Flash (&lt; 300ms per draft) with zero local GPU load or VRAM overhead.</td></tr>
-<tr><td><b>Human-in-the-Loop Telegram Control</b></td><td>Delivers interactive cards to your Telegram app with inline buttons: <code>[✅ Approve & Send]</code>, <code>[✏️ Edit Email]</code>, and <code>[❌ Skip]</code>.</td></tr>
-<tr><td><b>Interactive Real-Time Editing</b></td><td>Tap <code>[✏️ Edit Email]</code> directly in Telegram to customize your copy before approval — card text refreshes live in your chat.</td></tr>
-<tr><td><b>Deliverability & MX Verification</b></td><td>Verifies recipient domain MX records and contact emails before drafting to protect domain reputation and prevent bounces.</td></tr>
-<tr><td><b>Proof-of-Work Personalization</b></td><td>Connects real engineering projects (<code>SideDoor</code>, <code>drift-watch</code> at <code>Oximy YC26</code>) directly to the target startup's technical pain points.</td></tr>
-<tr><td><b>Timezone-Aware Gmail Dispatch</b></td><td>Sends emails via Gmail API between 9:00 AM – 11:00 AM recipient local time with 2–8 minute randomized delays and native Gmail signatures.</td></tr>
-<tr><td><b>Zero Data & Credential Leakage</b></td><td>Secret keys live encrypted in GitHub Secrets. Markdown links automatically convert to clean HTML <code>&lt;a href="..."&gt;</code> tags without ugly raw URLs.</td></tr>
-</table>
+Runs 100% in the cloud via GitHub Actions. No laptop required after setup.
 
 ---
 
-## ⚡ Quickstart
+## How It Works
 
-### Linux, macOS, WSL2
+```
+Afternoon / Evening (background)
+  Discover startups  →  Light research  →  Find contact email
+
+Midnight
+  Gemini Flash generates personalized cold emails  (<300ms per draft)
+
+8:00 AM
+  Draft cards stream to your Telegram app
+
+You (from your phone)
+  [Approve & Send]   [Edit Email]   [Skip]
+
+Gmail
+  Sends during recipient business hours (9-11 AM local time)
+  Randomized 2-8 min delay between sends
+  Appends your Gmail signature automatically
+```
+
+---
+
+## Features
+
+| | |
+|---|---|
+| **Staggered pipeline** | Runs in 15-company micro-batches throughout the day to avoid API rate limits. |
+| **Sub-second drafting** | Google Gemini Flash generates each email in under 300ms. No local GPU needed. |
+| **Personalized voice** | Emails are written in your voice — your name, role, project, and examples from your actual emails. |
+| **Human review gate** | Every email passes through you on Telegram before it sends. |
+| **Live editing** | Tap Edit in Telegram, reply with your changes. The card updates instantly. |
+| **MX verification** | Checks domain mail records before drafting to avoid bounces. |
+| **Timezone-aware send** | Gmail API sends during 9-11 AM recipient local time, not yours. |
+| **Cloud-persistent DB** | Supabase stores all data. Companies, contacts, and drafts survive between GitHub Actions runs. |
+| **Multi-user safe** | Each user runs their own Supabase project. No shared state, no mixing. |
+
+---
+
+## One-Paste Agent Setup
+
+> If you are using an AI coding agent (Claude, Cursor, Antigravity, or similar), copy the prompt below and paste it into your agent. The agent will handle the full setup interactively — checking dependencies, collecting keys, and running the first pipeline batch.
+
+```
+You are setting up the Outreach Agent from https://github.com/codeharsh27/outreach-agent.
+Follow these steps in order. At each step, check whether it is already done before proceeding.
+If you need a value from the user (API key, URL, etc.), explain what it is, where to get it, and wait for them to paste it.
+
+Step 1 — Environment check
+- Are we running on Linux, macOS, or WSL2?
+- If on bare Windows (not WSL), tell the user to open WSL2 first: run `wsl --install` in PowerShell, reboot, then come back.
+- Check: Python 3.11+ is installed. If not, install via: sudo apt install python3 python3-pip python3-venv
+- Check: git is installed. If not, install via: sudo apt install git
+
+Step 2 — Clone and install
+- git clone https://github.com/codeharsh27/outreach-agent.git ~/outreach-agent
+- cd ~/outreach-agent
+- python3 -m venv .venv && source .venv/bin/activate
+- pip install -r requirements.txt
+
+Step 3 — Collect API keys (one at a time, explain each before asking)
+a. Gemini API key — free at https://aistudio.google.com/apikey
+   Ask the user to paste it.
+b. Telegram Bot Token — open Telegram, message @BotFather, send /newbot, follow prompts.
+   Ask the user to paste the token.
+c. Telegram Chat ID — tell the user to send any message to their new bot, then fetch:
+   curl https://api.telegram.org/bot<TOKEN>/getUpdates
+   Extract the chat.id value. Ask the user to paste it.
+d. Gmail address — ask the user for their Gmail address.
+
+Step 4 — Personalization (for cold email voice)
+Ask the user:
+- Your full name?
+- Your role? (e.g. Backend Engineer, Full Stack Developer, ML Engineer)
+- Your main project name?
+- One sentence describing what your project does?
+- Your project URL (optional)?
+- Your portfolio URL (optional)?
+- Your GitHub URL (optional)?
+
+Step 5 — Supabase setup (cloud database, free tier)
+- Tell the user to go to https://supabase.com, create a free account, and create a new project.
+- Once the project is ready: Project Settings → API
+  - Copy "Project URL" (looks like https://xxxx.supabase.co)
+  - Copy "anon / public" key (long JWT string starting with eyJ)
+- Ask the user to paste both.
+- Tell the user to open the SQL Editor in Supabase dashboard and run the contents of scripts/supabase_schema.sql
+- Then run this SQL to disable RLS:
+  ALTER TABLE companies DISABLE ROW LEVEL SECURITY;
+  ALTER TABLE contacts DISABLE ROW LEVEL SECURITY;
+  ALTER TABLE drafts DISABLE ROW LEVEL SECURITY;
+  ALTER TABLE sends DISABLE ROW LEVEL SECURITY;
+  ALTER TABLE follow_ups DISABLE ROW LEVEL SECURITY;
+
+Step 6 — Write .env file
+Write all collected values into ~/outreach-agent/.env using the format from .env.example.
+
+Step 7 — Gmail OAuth
+- Run: python3 scripts/setup_gmail.py
+- A browser window will open. Tell the user to log in and click Allow.
+- Confirm the token.json file was created in the config/ directory.
+
+Step 8 — Verify and run first batch
+- Run: PYTHONPATH=. python3 -m agents.orchestrate stats
+- Confirm Supabase connected and tables are accessible.
+- Run: PYTHONPATH=. python3 -m agents.orchestrate minibatch
+- Confirm the first 15 companies are discovered, researched, and contacts found.
+
+If any step fails, read the error carefully, fix it, and continue from where it failed.
+```
+
+---
+
+## Manual Setup
+
+### Requirements
+
+- Python 3.11+
+- Git and WSL2 (on Windows) or Linux / macOS
+- Gemini API key — [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free)
+- Telegram bot — [@BotFather](https://t.me/BotFather) (free)
+- Supabase project — [supabase.com](https://supabase.com) (free tier)
+
+### Install
 
 ```bash
 git clone https://github.com/codeharsh27/outreach-agent.git
 cd outreach-agent
-
-# Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### Environment Setup (`.env`)
+### Database
 
-Create a `.env` file in the project root:
+Create a free Supabase project, then run [`scripts/supabase_schema.sql`](scripts/supabase_schema.sql) in the SQL Editor to create all tables.
+
+Disable Row Level Security on all tables:
+
+```sql
+ALTER TABLE companies   DISABLE ROW LEVEL SECURITY;
+ALTER TABLE contacts    DISABLE ROW LEVEL SECURITY;
+ALTER TABLE drafts      DISABLE ROW LEVEL SECURITY;
+ALTER TABLE sends       DISABLE ROW LEVEL SECURITY;
+ALTER TABLE follow_ups  DISABLE ROW LEVEL SECURITY;
+```
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and fill in all values:
 
 ```env
-# Gemini API Key (Free, sub-second generation)
-GEMINI_API_KEY=AIzaSy...
+# LLM
+GEMINI_API_KEY=
 
-# Telegram Bot Token & Chat ID
-TELEGRAM_BOT_TOKEN=8777139128:...
-TELEGRAM_CHAT_ID=1918356...
+# Telegram
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
 
-# Gmail Sender Address
-GMAIL_SENDER_EMAIL=you@gmail.com
+# Gmail
+GMAIL_SENDER_EMAIL=
+
+# Supabase
+SUPABASE_URL=
+SUPABASE_KEY=
+
+# Your identity (used in email drafts)
+YOUR_NAME=
+YOUR_EMAIL=
+USER_ROLE=
+USER_PROJECT_NAME=
+USER_PROJECT_DESC=
+SIDEDOOR_URL=
+PORTFOLIO_URL=
+GITHUB_URL=
 ```
 
-### One-Time Gmail API Authentication
+### Gmail Authentication
+
+Run once to authorize Gmail API access:
 
 ```bash
-python3 scripts/setup_gmail.sh
+python3 scripts/setup_gmail.py
+```
+
+A browser window opens. Log in and click Allow. A `config/token.json` file is saved.
+
+### Verify Setup
+
+```bash
+PYTHONPATH=. python3 -m agents.orchestrate stats
 ```
 
 ---
 
-## 🕹️ CLI & Pipeline Commands
+## Commands
 
-Outreach Agent has a unified CLI entry point (`agents.orchestrate`):
+```bash
+# Run full pipeline end-to-end
+PYTHONPATH=. python3 -m agents.orchestrate run
 
-| Action | Command | Description |
-|---|---|---|
-| **Run Full Pipeline** | `python3 -m agents.orchestrate run` | Runs discovery → research → contact → draft → Telegram push → Gmail send |
-| **Run Micro-Batch** | `python3 -m agents.orchestrate minibatch` | Runs a 15-company background pre-stage job (Discovery + Research + Contact) |
-| **Night Drafting** | `python3 -m agents.orchestrate draft_night` | Runs Gemini 3.6 Flash drafting for pre-staged companies |
-| **Morning Telegram Push** | `python3 -m agents.orchestrate morning_push` | Streams 45–50 pre-staged draft cards to Telegram app at 8:00 AM |
-| **Pipeline Metrics** | `python3 -m agents.orchestrate stats` | Prints real-time database counts, tier breakdown, and draft status |
+# Background micro-batch (15 companies: discover + research + contact)
+PYTHONPATH=. python3 -m agents.orchestrate minibatch
 
----
+# Night drafting — generate emails for pre-staged companies
+PYTHONPATH=. python3 -m agents.orchestrate draft_night
 
-## 📱 Telegram Interactive Card Reference
+# Morning push — stream draft cards to Telegram
+PYTHONPATH=. python3 -m agents.orchestrate morning_push
 
-When cards land on your Telegram app, you control the workflow with 3 inline buttons:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 🏢 PostHog  ·  James  ·  posthog.com                        │
-│ 📧 hey@posthog.com                                          │
-│                                                             │
-│ ━━━━━━ EMAIL DRAFT ━━━━━━                                   │
-│ Subject: When GitHub approval events silently drift...      │
-│                                                             │
-│ Hi James,                                                   │
-│ Diving through PostHog's open-source repo, I noticed how    │
-│ tricky it gets to track GitHub approval states...           │
-│                                                             │
-│ ━━━━━━ LINKEDIN (copy-paste) ━━━━━━                         │
-│ Hey James, noticed how PostHog tracks GitHub approval...    │
-│                                                             │
-│ ━━━━━━ X REPLY ━━━━━━                                       │
-│ The hardest part of tracking multi-provider event states... │
-└─────────────────────────────────────────────────────────────┘
-  [✅ Approve & Send Email]  [✏️ Edit Email]  [❌ Skip Draft]
+# Pipeline stats
+PYTHONPATH=. python3 -m agents.orchestrate stats
 ```
 
-- **`[✅ Approve & Send Email]`**: Queues email for timezone-aware Gmail sending.
-- **`[✏️ Edit Email]`**: Reply with custom copy → database updates → card refreshes live on your screen.
-- **`[❌ Skip Draft]`**: Archives draft and removes card.
+---
+
+## Cloud Deployment (GitHub Actions)
+
+The pipeline runs automatically every weekday at 8:00 AM UTC via [`.github/workflows/outreach_cron.yml`](.github/workflows/outreach_cron.yml).
+
+Add these secrets to your GitHub repository under **Settings → Secrets and variables → Actions**:
+
+| Secret | Description |
+|---|---|
+| `GEMINI_API_KEY` | Google AI Studio key |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token |
+| `TELEGRAM_CHAT_ID` | Your Telegram chat ID |
+| `GMAIL_SENDER_EMAIL` | Your Gmail address |
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_KEY` | Your Supabase anon key |
+| `YOUR_NAME` | Your full name |
+| `USER_ROLE` | Your role (e.g. Backend Engineer) |
+| `USER_PROJECT_NAME` | Your project name |
+| `USER_PROJECT_DESC` | One sentence about your project |
+
+Once secrets are set, the pipeline runs in the cloud. Your laptop can be off.
 
 ---
 
-## ☁️ Autonomous Cloud Deployment (GitHub Actions)
+## Telegram Card Flow
 
-Outreach Agent runs 100% autonomously in the cloud via **GitHub Actions**.
+Each morning, cards arrive in your Telegram app:
 
-1. Push your repository to GitHub (`codeharsh27/outreach-agent`).
-2. Go to **Settings → Secrets and variables → Actions**.
-3. Add these 4 encrypted repository secrets:
-   - `GEMINI_API_KEY`
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-   - `GMAIL_SENDER_EMAIL`
+```
+PostHog  ·  James  ·  posthog.com
+hey@posthog.com
 
-The cron workflow ([`.github/workflows/outreach_cron.yml`](.github/workflows/outreach_cron.yml)) executes every Monday through Friday at 08:00 AM UTC. Your laptop can be completely off while cards stream to your phone every morning.
+--- EMAIL DRAFT ---
+Subject: When GitHub approval events silently drift
+
+Hi James,
+Diving through PostHog's open-source repo...
+
+[Approve & Send Email]   [Edit Email]   [Skip Draft]
+```
+
+Tapping **Edit Email** prompts you to reply with your revised text. The card updates live. Tapping **Approve** queues the email for timezone-aware Gmail delivery.
 
 ---
 
-## 🛡️ License & Author
+## License
 
-MIT License. Designed and engineered by **[Harsh Mule](https://github.com/codeharsh27)**.
+MIT. Built by [Harsh Mule](https://github.com/codeharsh27).
