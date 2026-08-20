@@ -294,12 +294,22 @@ def queue_send(draft_id: int, platform: str, scheduled_for: str) -> int:
 
 def mark_sent(send_id: int):
     try:
+        now = datetime.now(timezone.utc)
         _sb().table("sends").update({
             "status": "sent",
-            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "sent_at": now.isoformat(),
         }).eq("id", send_id).execute()
+
+        # Schedule follow-up 4 days later
+        due_at = (now + timedelta(days=4)).isoformat()
+        _sb().table("follow_ups").insert({
+            "send_id": send_id,
+            "due_at": due_at,
+            "status": "pending",
+        }).execute()
     except Exception as e:
         print(f"  [tracker] mark_sent error: {e}")
+
 
 
 def already_contacted(domain: str) -> bool:

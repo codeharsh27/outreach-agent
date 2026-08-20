@@ -27,15 +27,15 @@ ollama = OpenAI(base_url=f"{OLLAMA_HOST}/v1", api_key="ollama")
 # ── Few-shot examples (real emails that worked) ───────────────────
 FEW_SHOT_EXAMPLES = """
 EXAMPLE 1:
-Subject: The silent regression hiding in your normalization layer
+Subject: When GitHub approval events silently drift...
 Body:
-Hi Krrish,
+Hi James,
 
-Read a breakdown of how LiteLLM's normalization can quietly drop things across providers, tool-calls argument type, citation fields, safe_settings so provider swap ships a regression nobody catches until it's live.
+Read a breakdown of how tracking GitHub approval states across distributed providers can quietly drop tool-call argument types and citation fields during provider swaps—leaving a silent regression nobody catches until it's live in production.
 
-I have built drift-watch for a similar problem at Oximy(YC26) - diffs vendor API response shapes and flags exactly that kind of silent drift before it hits production. It maps closely onto what your normalization layer risks, just at a bigger scale.
+I built drift-watch for a similar problem at Oximy (YC26)—it diffs vendor API response shapes and flags exactly that kind of silent schema drift before it hits production. It maps closely onto what your provider event pipeline risks, just at a bigger scale.
 
-Worth pointing it at a couple of your provider pairs? Or if this is already solved internally, genuinely curious how.
+Worth pointing drift-watch at a couple of your provider pairs? Or if this is already solved internally at PostHog, genuinely curious how.
 
 Harsh Mule
 Building [SideDoor](https://sidedoor-chi.vercel.app/) | [Portfolio](https://harshmule.vercel.app/)

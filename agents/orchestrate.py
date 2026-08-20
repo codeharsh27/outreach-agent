@@ -129,7 +129,6 @@ def run_morning_push():
         print("\n📨 Sending approved emails...")
         send.run(approved_ids)
 
-
 def clear_stale_drafts():
     """Wipe all pending/drafted_ready test drafts from Supabase."""
     verify_connection()
@@ -141,6 +140,31 @@ def clear_stale_drafts():
         print(f"❌ Error clearing drafts: {e}")
 
 
+def dedup_drafts():
+
+    """Keep only 1 latest pending draft per company in Supabase, deleting older duplicate rows."""
+    verify_connection()
+    try:
+        res = _sb().table("drafts").select("id, company_id, created_at").in_("status", ["pending", "drafted_ready"]).order("created_at", desc=True).execute()
+        rows = res.data or []
+        seen_companies = set()
+        to_delete = []
+
+        for r in rows:
+            cid = r.get("company_id")
+            if cid in seen_companies:
+                to_delete.append(r["id"])
+            else:
+                seen_companies.add(cid)
+
+        if to_delete:
+            _sb().table("drafts").delete().in_("id", to_delete).execute()
+            print(f"🧹 Deduplicated Supabase drafts: removed {len(to_delete)} duplicate rows!")
+        else:
+            print("✅ No duplicate drafts found in Supabase.")
+    except Exception as e:
+        print(f"❌ Error deduplicating drafts: {e}")
+
 
 if __name__ == "__main__":
     import argparse
@@ -148,7 +172,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "command", nargs="?", default="run",
         choices=["run", "discover", "research", "draft", "contact",
-                 "minibatch", "draft_night", "morning_push", "stats", "test", "clear_drafts"],
+                 "minibatch", "draft_night", "morning_push", "stats", "test", "clear_drafts", "dedup_drafts", "followup"],
         help="Command to run",
     )
     args = parser.parse_args()
@@ -166,6 +190,12 @@ if __name__ == "__main__":
         run_morning_push()
     elif args.command == "clear_drafts":
         clear_stale_drafts()
+    elif args.command == "dedup_drafts":
+        dedup_drafts()
+    elif args.command == "followup":
+        from agents import followup
+        followup.run()
+
     elif args.command == "discover":
         verify_connection()
         discover.run(max_new=200)
