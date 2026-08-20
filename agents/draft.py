@@ -216,7 +216,7 @@ def run(limit: int = 45):
 
     rows_res = sb.table("companies") \
         .select(
-            "id as company_id, name, domain, pain_point, evidence_url, suggested_angle, tier, fit_score, "
+            "id, name, domain, pain_point, evidence_url, suggested_angle, tier, fit_score, "
             "contacts(id, name, email)"
         ) \
         .not_.is_("pain_point", "null") \
@@ -226,12 +226,14 @@ def run(limit: int = 45):
 
     rows = []
     for r in (rows_res.data or []):
-        if r["company_id"] in drafted_ids:
+        company_id = r["id"]
+        if company_id in drafted_ids:
             continue
         contacts_list = r.get("contacts", []) or []
         if not contacts_list:
             continue
         contact = contacts_list[0]
+        r["company_id"] = company_id
         rows.append((r, contact))
         if len(rows) >= limit:
             break
@@ -253,6 +255,7 @@ def run(limit: int = 45):
             time.sleep(4.0)
         except Exception as e:
             print(f"    ❌ {company['name']}: {e}")
+
 
     print(f"\n✅ Draft agent complete: {drafted}/{len(rows)} drafts created")
 
