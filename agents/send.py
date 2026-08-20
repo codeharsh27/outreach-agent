@@ -5,7 +5,6 @@ Adds 2–8 min random delay between sends to mimic human behavior.
 """
 import base64
 import random
-import sqlite3
 import time
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
@@ -16,8 +15,9 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-from agents.config import GMAIL_SENDER, GMAIL_TOKEN, GMAIL_CREDS, SEND_DAYS, TRACKER_DB
-from agents.tracker import queue_send, mark_sent
+from agents.config import GMAIL_SENDER, GMAIL_TOKEN, GMAIL_CREDS, SEND_DAYS
+from agents.tracker import queue_send, mark_sent, _sb
+
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
@@ -211,11 +211,12 @@ def send_email(service, draft_id: int, to: str, subject: str,
         print(f"    ✅ Email sent to {to}")
         return True
     except Exception as e:
-        conn = sqlite3.connect(str(TRACKER_DB))
-        conn.execute("UPDATE sends SET status='failed', error=? WHERE id=?",
-                     (str(e), send_id))
-        conn.commit()
-        conn.close()
+        try:
+            _sb().table("sends").update(
+                {"status": "failed", "error": str(e)}
+            ).eq("id", send_id).execute()
+        except Exception:
+            pass
         print(f"    ❌ Send failed: {e}")
         return False
 
@@ -234,48 +235,55 @@ def run(approved_draft_ids: list):
     print(f"\n📨 Sending {len(approved_draft_ids)} approved emails...")
     service = get_gmail_service()
 
-    conn = sqlite3.connect(str(TRACKER_DB))
-    conn.row_factory = sqlite3.Row
-
     sent_count = 0
     for i, draft_id in enumerate(approved_draft_ids):
-        row = conn.execute("""
-            SELECT d.*, co.name as company_name, co.domain, co.hq_country,
-                   ct.email, ct.name as contact_name
-            FROM drafts d
-            JOIN companies co ON co.id = d.company_id
-            JOIN contacts  ct ON ct.id = d.contact_id
-            WHERE d.id = ?
-        """, (draft_id,)).fetchone()
+        try:
+            res = _sb().table("drafts") \
+                .select(
+                    "*, "
+                    "companies!drafts_company_id_fkey(name, domain, hq_country), "
+                    "contacts!drafts_contact_id_fkey(name, email)"
+                ) \
+                .eq("id", draft_id) \
+                .limit(1) \
+                .execute()
 
-        if not row:
+            if not res.data:
+                continue
+
+            row = res.data[0]
+            co  = row.pop("companies", {}) or {}
+            ct  = row.pop("contacts", {}) or {}
+        except Exception as e:
+            print(f"   Error fetching draft {draft_id}: {e}")
             continue
 
-        row = dict(row)
-        company = {"domain": row.get("domain"), "hq_country": row.get("hq_country"),
-                   "name": row.get("company_name")}
+        company = {
+            "domain":     co.get("domain"),
+            "hq_country": co.get("hq_country"),
+            "name":       co.get("name"),
+        }
 
-        print(f"\n  [{i+1}/{len(approved_draft_ids)}] {row['company_name']} → {row['email']}")
+        print(f"\n  [{i+1}/{len(approved_draft_ids)}] {co.get('name')} → {ct.get('email')}")
 
         success = send_email(
             service=service,
             draft_id=draft_id,
-            to=row["email"],
-            subject=row["email_subject"],
-            body=row["email_body"],
+            to=ct.get("email", ""),
+            subject=row.get("email_subject", ""),
+            body=row.get("email_body", ""),
             company=company,
         )
 
         if success:
             sent_count += 1
 
-        # Random delay between sends (2–8 min) — avoids spam detection
+        # Random delay between sends (2–8 min)
         if i < len(approved_draft_ids) - 1:
             delay = random.randint(120, 480)
             print(f"    ⏳ Waiting {delay//60}m {delay%60}s before next send...")
             time.sleep(delay)
 
-    conn.close()
     print(f"\n✅ Send complete: {sent_count}/{len(approved_draft_ids)} sent")
 
     # Send Telegram summary
@@ -294,11 +302,10 @@ def run(approved_draft_ids: list):
 
 
 if __name__ == "__main__":
-    # Test: list approved drafts and send them
-    conn = sqlite3.connect(str(TRACKER_DB))
-    conn.row_factory = sqlite3.Row
-    approved = [r["id"] for r in conn.execute(
-        "SELECT id FROM drafts WHERE status='approved'"
-    ).fetchall()]
-    conn.close()
-    run(approved)
+    try:
+        res = _sb().table("drafts").select("id").eq("status", "approved").execute()
+        approved = [r["id"] for r in (res.data or [])]
+        run(approved)
+    except Exception as e:
+        print(f"Error: {e}")
+

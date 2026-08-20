@@ -12,3 +12,4 @@ sqlite-utils>=3.35
 pytz>=2024.1
 python-telegram-bot>=20.8
 dnspython>=2.6.0
+supabase>=2.3.0

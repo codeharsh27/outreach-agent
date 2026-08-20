@@ -1,34 +1,26 @@
 """
-Draft agent — generates 3 outreach formats per company:
-  1. Email (primary, fully automated send)
-  2. LinkedIn message (you copy-paste, 10 sec)
-  3. X reply (find a recent tweet, draft a reply, you post)
+Draft agent — generates personalized cold emails only.
+LinkedIn and X drafts removed — email is the only outreach channel here.
 
-Uses local Ollama (qwen3:4b) with Harsh's exact voice rules
-and 3 real email samples as few-shot examples.
+Uses Google Gemini Flash (sub-second) with the user's own voice rules,
+3 real email examples as few-shot, and personalization from .env.
 """
 import httpx
-import sqlite3
 import json
 import time
 from openai import OpenAI
 from agents.config import (
-    OLLAMA_HOST, OLLAMA_MODEL, TRACKER_DB,
+    OLLAMA_HOST, OLLAMA_MODEL,
     YOUR_NAME, SIDEDOOR_URL, PORTFOLIO_URL,
     TWITTER_URL, LINKEDIN_URL, GITHUB_URL,
-    GMAIL_SENDER, GEMINI_API_KEY, OPENROUTER_API_KEY
+    GMAIL_SENDER, GEMINI_API_KEY, OPENROUTER_API_KEY,
+    USER_ROLE, USER_PROJECT_NAME, USER_PROJECT_DESC,
 )
-from agents.tracker import save_draft
+from agents.tracker import save_draft, update_company_status, verify_connection
 
 ollama = OpenAI(base_url=f"{OLLAMA_HOST}/v1", api_key="ollama")
 
-# ── Signature (used in all emails) ───────────────────────────────
-SIGNATURE = f"""--
-{YOUR_NAME}
-Building [SideDoor]({SIDEDOOR_URL}) | [Portfolio]({PORTFOLIO_URL})
-Socials: [X]({TWITTER_URL}) | [LinkedIn]({LINKEDIN_URL}) | [Github]({GITHUB_URL})"""
-
-# ── Few-shot examples (Harsh's actual emails that worked) ────────
+# ── Few-shot examples (real emails that worked) ───────────────────
 FEW_SHOT_EXAMPLES = """
 EXAMPLE 1:
 Subject: The silent regression hiding in your normalization layer
@@ -57,8 +49,10 @@ I'm looking for somewhere I can contribute to problems with that kind of consequ
 If there's a product or engineering problem at Intangles where an extra pair of hands could actually move it forward, I'd love to take a shot at it.
 """
 
-# ── System prompt with voice rules ───────────────────────────────
-SYSTEM_PROMPT = f"""You are writing cold outreach on behalf of {YOUR_NAME}, a software engineer who built SideDoor ({SIDEDOOR_URL}) and drift-watch.
+# ── System prompt — built from personalization vars ───────────────
+SYSTEM_PROMPT = f"""You are writing cold outreach emails on behalf of {YOUR_NAME}, a {USER_ROLE} who built {USER_PROJECT_NAME} ({SIDEDOOR_URL}).
+
+About their project: {USER_PROJECT_DESC}
 
 VOICE RULES — follow exactly:
 
@@ -72,8 +66,8 @@ Email body (4-6 sentences MAX, never more):
 1. Opening: what you NOTICED about their work — specific, not generic
    - Reference: a code pattern, a public issue, a product behavior, a hiring signal
    - NEVER start with "I", "My name", "Hope", "I saw your profile"
-2. Connection (1-2 sentences): link their specific problem to what Harsh has built
-   - Reference built projects naturally: SideDoor ({SIDEDOOR_URL}), drift-watch, Oximy (YC26)
+2. Connection (1-2 sentences): link their specific problem to what {YOUR_NAME} has built
+   - Reference built projects naturally: {USER_PROJECT_NAME} ({SIDEDOOR_URL}), Portfolio ({PORTFOLIO_URL})
 3. Ask (1 sentence, soft, genuine, ONE thing only):
    - "Worth pointing X at Y?" (technical)
    - "Genuinely curious how you've solved X." (intellectual)
@@ -83,68 +77,36 @@ Email body (4-6 sentences MAX, never more):
 Tone:
 - Match their public voice — casual if they tweet casually, precise if they write technical posts
 - Never corporate, never apologetic, never templated, no artificial dividers or AI signatures
-- Short is always better
+- Short is always better. Under 120 words is ideal.
 
-Here are 3 real examples of emails Harsh wrote that worked:
+Here are 3 real examples of emails that worked:
 {FEW_SHOT_EXAMPLES}
 
 IMPORTANT: Output ONLY valid JSON, nothing else. No markdown code blocks."""
 
 
-# ── X / Twitter: find recent tweet ───────────────────────────────
-
-def find_recent_tweet(twitter_handle: str) -> dict | None:
-    """
-    Try to find a recent relevant tweet via nitter (no auth needed).
-    Returns {url, text} or None.
-    """
-    if not twitter_handle:
-        return None
-    handle = twitter_handle.replace("https://x.com/", "").replace("https://twitter.com/", "").strip("/")
-    try:
-        # Use nitter as a scraping proxy (no auth needed)
-        nitter_instances = ["https://nitter.net", "https://nitter.privacydev.net"]
-        for instance in nitter_instances:
-            try:
-                r = httpx.get(f"{instance}/{handle}", timeout=8,
-                              headers={"User-Agent": "Mozilla/5.0"})
-                if r.status_code != 200:
-                    continue
-                from bs4 import BeautifulSoup
-                soup = BeautifulSoup(r.text, "html.parser")
-                tweets = soup.select(".tweet-content")
-                links = soup.select(".tweet-link")
-                if tweets and links:
-                    text = tweets[0].get_text(strip=True)
-                    tweet_path = links[0].get("href", "")
-                    tweet_url = f"https://x.com{tweet_path}"
-                    return {"text": text[:280], "url": tweet_url}
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return None
-
-
-# ── Cloud LLM API Client (Gemini Flash - Sub-second) ─────────────
+# ── Cloud LLM API Client ──────────────────────────────────────────
 
 def call_llm(system_prompt: str, user_prompt: str) -> str:
     """
-    Call cloud LLM (Gemini Flash or OpenRouter) for sub-second generation.
-    Falls back to local Ollama if no cloud API key is present.
+    Call Gemini Flash (primary), OpenRouter (fallback), then local Ollama.
+    Returns raw text response from the model.
     """
-    # 1. Try Gemini API (Free, sub-second)
+    # 1. Gemini API (Free, sub-second)
     if GEMINI_API_KEY and len(GEMINI_API_KEY.strip()) > 5:
-        for model in ["gemini-3.6-flash", "gemini-1.5-flash-latest", "gemini-2.5-flash-lite", "gemini-3.5-flash"]:
+        for model in ["gemini-2.5-flash-lite", "gemini-1.5-flash-latest", "gemini-2.0-flash"]:
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY.strip()}"
+                url = (
+                    f"https://generativelanguage.googleapis.com/v1beta/models/"
+                    f"{model}:generateContent?key={GEMINI_API_KEY.strip()}"
+                )
                 payload = {
                     "system_instruction": {"parts": [{"text": system_prompt}]},
                     "contents": [{"parts": [{"text": user_prompt}]}],
                     "generationConfig": {
                         "temperature": 0.7,
-                        "response_mime_type": "application/json"
-                    }
+                        "response_mime_type": "application/json",
+                    },
                 }
                 r = httpx.post(url, json=payload, timeout=30)
                 if r.status_code == 200:
@@ -154,26 +116,24 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
                         parts = candidates[0]["content"].get("parts", [])
                         if parts:
                             return parts[0].get("text", "")
-                elif r.status_code != 404:
-                    print(f"    [Gemini API ({model})] HTTP {r.status_code}: {r.text[:100]}")
-            except Exception as e:
+                elif r.status_code not in (404, 429):
+                    print(f"    [Gemini ({model})] HTTP {r.status_code}: {r.text[:100]}")
+            except Exception:
                 pass
 
-    # 2. Try OpenRouter API
+    # 2. OpenRouter fallback
     if OPENROUTER_API_KEY and len(OPENROUTER_API_KEY.strip()) > 5:
-        or_models = [
-            "google/gemini-2.0-flash-001",
-            "meta-llama/llama-3.3-70b-instruct",
-            "qwen/qwen-2.5-coder-32b-instruct"
-        ]
-        or_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY.strip())
-        for m in or_models:
+        or_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY.strip()
+        )
+        for m in ["google/gemini-2.0-flash-001", "meta-llama/llama-3.3-70b-instruct"]:
             try:
                 response = or_client.chat.completions.create(
                     model=m,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
+                        {"role": "user",   "content": user_prompt},
                     ],
                     temperature=0.7,
                 )
@@ -183,72 +143,62 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
             except Exception:
                 pass
 
-    # 3. Fallback to local Ollama
+    # 3. Local Ollama (final fallback)
     response = ollama.chat.completions.create(
         model=OLLAMA_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user",   "content": user_prompt},
         ],
         temperature=0.7,
     )
     return response.choices[0].message.content.strip()
 
 
-# ── Main draft generation ─────────────────────────────────────────
+# ── Email draft generation ────────────────────────────────────────
 
 def generate_draft(company: dict, contact: dict) -> dict:
     """
-    Generate email + LinkedIn + X reply drafts for one company in < 1 second.
-    Returns dict with all three.
+    Generate a personalized cold email for one company/contact pair.
+    Returns: {"email_subject": "...", "email_body": "..."}
     """
-    company_name = company["name"]
-    contact_name = (contact.get("contact_name") or contact.get("name") or "").split()[0] or "there"
-    domain = company.get("domain", "")
-    pain_point = company.get("pain_point", "")
+    company_name = company.get("name", "")
+    contact_name = (
+        contact.get("contact_name") or contact.get("name") or ""
+    ).split()[0] or "there"
+    domain       = company.get("domain", "")
+    pain_point   = company.get("pain_point", "")
     evidence_url = company.get("evidence_url", "")
-    angle = company.get("suggested_angle", "")
-    twitter_url = contact.get("twitter_url") or company.get("twitter_url")
+    angle        = company.get("suggested_angle", "")
 
-    print(f"  ✍️  Drafting for {company_name} → {contact_name}")
+    print(f"  ✍️  Drafting email for {company_name} → {contact_name}")
 
-    # Find recent tweet for X reply
-    tweet = find_recent_tweet(twitter_url) if twitter_url else None
-
-    # Build the prompt
     user_prompt = f"""Company: {company_name}
 Contact first name: {contact_name}
 Their domain: {domain}
 Pain point found: {pain_point}
 Evidence URL: {evidence_url}
 Suggested angle: {angle}
-Recent tweet (if any): {tweet['text'] if tweet else 'none found'}
-Tweet URL (if any): {tweet['url'] if tweet else ''}
 
-Write three outreach formats:
-1. Email (subject + body in Harsh's voice, MAX 100-140 words total, NO signature lines or -- dividers)
-2. LinkedIn DM (same angle, plain text, no markdown links, max 200 chars)
-3. X reply to their tweet (max 250 chars, smart observation or question, no pitch)
+Write a cold outreach email in {YOUR_NAME}'s voice.
+Keep body under 120 words. No signature lines or -- dividers.
 
-Output ONLY this JSON structure:
+Output ONLY this JSON:
 {{
   "email_subject": "...",
-  "email_body": "Hi {contact_name},\\n...",
-  "linkedin_msg": "...",
-  "x_reply_text": "...",
-  "x_reply_url": "{tweet['url'] if tweet else ''}"
+  "email_body": "Hi {contact_name},\\n..."
 }}"""
 
     try:
         text = call_llm(SYSTEM_PROMPT, user_prompt)
 
-        # Extract JSON even if model wraps it
+        # Extract JSON even if model adds surrounding text
         start = text.find("{")
-        end = text.rfind("}") + 1
+        end   = text.rfind("}") + 1
         if start >= 0 and end > start:
             draft = json.loads(text[start:end])
 
-            # Clean any accidental -- dividers
+            # Strip any accidental -- dividers or signature lines
             body = draft.get("email_body", "")
             if "--" in body:
                 body = body.split("--")[0].strip()
@@ -259,65 +209,64 @@ Output ONLY this JSON structure:
     except Exception as e:
         print(f"    [Draft LLM] Error: {e}")
 
-    # Fallback draft
+    # Fallback
     return {
         "email_subject": f"Quick thought about {company_name}",
-        "email_body": f"Hi {contact_name},\n\n{angle}",
-        "linkedin_msg": f"Hi {contact_name}, {angle[:150]}",
-        "x_reply_text": f"Interesting angle on {pain_point[:100]}",
-        "x_reply_url": tweet["url"] if tweet else "",
+        "email_body":    f"Hi {contact_name},\n\n{angle}",
     }
 
 
 # ── Main draft run ────────────────────────────────────────────────
 
-def run(limit=45):
-    """Generate drafts for top N researched + contacted companies with no draft yet."""
+def run(limit: int = 45):
+    """Generate email drafts for top N contacted companies with no draft yet."""
     print("\n✍️  Running draft agent...")
+    verify_connection()
 
-    conn = sqlite3.connect(str(TRACKER_DB))
-    conn.row_factory = sqlite3.Row
+    from agents.tracker import _sb
+    sb = _sb()
 
-    rows = conn.execute("""
-        SELECT
-            co.id as company_id,
-            co.name, co.domain, co.twitter_url,
-            co.pain_point, co.evidence_url, co.suggested_angle, co.tier,
-            ct.id as contact_id,
-            ct.name as contact_name,
-            ct.email, ct.linkedin_url, ct.twitter_url as contact_twitter
-        FROM companies co
-        JOIN contacts ct ON ct.company_id = co.id
-        WHERE co.pain_point IS NOT NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM drafts d WHERE d.company_id = co.id
-          )
-        ORDER BY co.fit_score DESC
-        LIMIT ?
-    """, (limit,)).fetchall()
-    conn.close()
+    # Get companies that have a contact but no draft yet
+    drafted_res = sb.table("drafts").select("company_id").execute()
+    drafted_ids = {r["company_id"] for r in (drafted_res.data or [])}
 
-    print(f"   {len(rows)} companies need drafts\n")
+    rows_res = sb.table("companies") \
+        .select(
+            "id as company_id, name, domain, pain_point, evidence_url, suggested_angle, tier, fit_score, "
+            "contacts!contacts_company_id_fkey(id, name, email)"
+        ) \
+        .not_.is_("pain_point", "null") \
+        .order("fit_score", desc=True) \
+        .limit(limit * 3) \
+        .execute()
+
+    rows = []
+    for r in (rows_res.data or []):
+        if r["company_id"] in drafted_ids:
+            continue
+        contacts_list = r.get("contacts", []) or []
+        if not contacts_list:
+            continue
+        contact = contacts_list[0]
+        rows.append((r, contact))
+        if len(rows) >= limit:
+            break
+
+    print(f"   {len(rows)} companies need email drafts\n")
 
     drafted = 0
-    from agents.tracker import update_company_status
-    for row in rows:
-        company = dict(row)
-        contact = dict(row)
+    for company, contact in rows:
         try:
             draft = generate_draft(company, contact)
-            save_draft(company["company_id"], company["contact_id"], {
+            save_draft(company["company_id"], contact["id"], {
                 "email_subject": draft.get("email_subject", ""),
-                "email_body": draft.get("email_body", ""),
-                "linkedin_msg": draft.get("linkedin_msg", ""),
-                "x_reply_text": draft.get("x_reply_text", ""),
-                "x_reply_url": draft.get("x_reply_url", ""),
-                "status": "drafted_ready",
+                "email_body":    draft.get("email_body", ""),
+                "status":        "drafted_ready",
             })
             update_company_status(company["company_id"], "drafted_ready")
             drafted += 1
-            print(f"    ✅ {company['name']}: '{draft.get('email_subject', '')[:50]}'")
-            time.sleep(4.0)  # Stay within Gemini free tier 15 RPM limit
+            print(f"    ✅ {company['name']}: '{draft.get('email_subject', '')[:55]}'")
+            time.sleep(4.0)  # Stay within Gemini free tier 15 RPM
         except Exception as e:
             print(f"    ❌ {company['name']}: {e}")
 

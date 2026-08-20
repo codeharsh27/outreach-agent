@@ -6,8 +6,13 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-PROJ = Path("/mnt/c/Users/asus/outreach-agent")
+# ── Resolve project root dynamically (works on any machine) ──────
+PROJ = Path(__file__).resolve().parent.parent
 load_dotenv(PROJ / ".env")
+
+# ── Supabase (Cloud DB) ──────────────────────────────────────────
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 # ── LLM Cloud Provider Keys ──────────────────────────────────────
 GEMINI_API_KEY     = os.getenv("GEMINI_API_KEY", "")
@@ -23,7 +28,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
 # ── Gmail ────────────────────────────────────────────────────────
-GMAIL_SENDER  = os.getenv("GMAIL_SENDER_EMAIL", "harshmude27@gmail.com")
+GMAIL_SENDER  = os.getenv("GMAIL_SENDER_EMAIL", "")
 GMAIL_CREDS   = PROJ / "config" / "gmail_credentials.json"
 GMAIL_TOKEN   = PROJ / "config" / "token.json"
 
@@ -32,28 +37,26 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # ── Contact APIs ─────────────────────────────────────────────────
-HUNTER_API_KEY  = os.getenv("HUNTER_API_KEY",  "")
-SNOVIO_USER_ID  = os.getenv("SNOVIO_USER_ID",  "")
-SNOVIO_SECRET   = os.getenv("SNOVIO_SECRET",   "")
+HUNTER_API_KEY   = os.getenv("HUNTER_API_KEY",  "")
+SNOVIO_USER_ID   = os.getenv("SNOVIO_USER_ID",  "")
+SNOVIO_SECRET    = os.getenv("SNOVIO_SECRET",   "")
 MINELEAD_API_KEY = os.getenv("MINELEAD_API_KEY", "")
 
-# ── Your identity (used in all drafts) ───────────────────────────
-YOUR_NAME     = os.getenv("YOUR_NAME",     "Harsh Mule")
-YOUR_EMAIL    = os.getenv("YOUR_EMAIL",    "harshmude27@gmail.com")
-SIDEDOOR_URL  = os.getenv("SIDEDOOR_URL",  "https://sidedoor-chi.vercel.app/")
-PORTFOLIO_URL = os.getenv("PORTFOLIO_URL", "https://harshmule.vercel.app/")
-TWITTER_URL   = os.getenv("TWITTER_URL",   "https://x.com/codeharsh27")
-LINKEDIN_URL  = os.getenv("LINKEDIN_URL",  "https://www.linkedin.com/in/harshmule27/")
-GITHUB_URL    = os.getenv("GITHUB_URL",    "https://github.com/codeharsh27")
+# ── User identity (used in all email drafts) ─────────────────────
+YOUR_NAME     = os.getenv("YOUR_NAME",     "")
+YOUR_EMAIL    = os.getenv("YOUR_EMAIL",    "")
+SIDEDOOR_URL  = os.getenv("SIDEDOOR_URL",  "")
+PORTFOLIO_URL = os.getenv("PORTFOLIO_URL", "")
+TWITTER_URL   = os.getenv("TWITTER_URL",   "")
+LINKEDIN_URL  = os.getenv("LINKEDIN_URL",  "")
+GITHUB_URL    = os.getenv("GITHUB_URL",    "")
 
-# ── Data paths ───────────────────────────────────────────────────
-DATA_DIR     = PROJ / "data"
-TARGETS_DIR  = DATA_DIR / "targets"
-TRACKER_DB   = DATA_DIR / "tracker" / "outreach.db"
+# ── Personalization (email drafting voice) ───────────────────────
+USER_ROLE         = os.getenv("USER_ROLE",         "Software Engineer")
+USER_PROJECT_NAME = os.getenv("USER_PROJECT_NAME", "")
+USER_PROJECT_DESC = os.getenv("USER_PROJECT_DESC", "")
 
-# Create dirs if missing
-TARGETS_DIR.mkdir(parents=True, exist_ok=True)
-(DATA_DIR / "tracker").mkdir(parents=True, exist_ok=True)
+# ── Local dirs (Gmail credentials only — DB is now Supabase) ────
 (PROJ / "config").mkdir(parents=True, exist_ok=True)
 
 # ── Outreach limits ──────────────────────────────────────────────

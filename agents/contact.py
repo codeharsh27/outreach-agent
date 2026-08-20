@@ -14,12 +14,12 @@ import httpx
 import smtplib
 import time
 import re
-import sqlite3
 from agents.config import (
     GITHUB_TOKEN, HUNTER_API_KEY, SNOVIO_USER_ID,
-    SNOVIO_SECRET, MINELEAD_API_KEY, TRACKER_DB
+    SNOVIO_SECRET, MINELEAD_API_KEY,
 )
-from agents.tracker import save_contact
+from agents.tracker import save_contact, update_company_status, _sb
+
 
 GH_HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",
@@ -356,29 +356,30 @@ def run(limit=15):
     """Find contacts for top N researched companies that don't have one yet."""
     print("\n📇 Running contact finder...")
 
-    conn = sqlite3.connect(str(TRACKER_DB))
-    conn.row_factory = sqlite3.Row
+    # Get company IDs that already have contacts
+    try:
+        existing = _sb().table("contacts").select("company_id").execute()
+        contacted_ids = {r["company_id"] for r in (existing.data or [])}
 
-    companies = conn.execute("""
-        SELECT c.* FROM companies c
-        WHERE c.pain_point IS NOT NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM contacts ct WHERE ct.company_id = c.id
-          )
-        ORDER BY c.fit_score DESC
-        LIMIT ?
-    """, (limit,)).fetchall()
-    conn.close()
+        res = _sb().table("companies") \
+            .select("*") \
+            .not_.is_("pain_point", "null") \
+            .order("fit_score", desc=True) \
+            .limit(limit * 3) \
+            .execute()
+
+        companies = [r for r in (res.data or []) if r["id"] not in contacted_ids][:limit]
+    except Exception as e:
+        print(f"   Error fetching companies: {e}")
+        return
 
     print(f"   {len(companies)} companies queued for contact search\n")
 
     found = 0
-    from agents.tracker import update_company_status
     for company in companies:
-        company = dict(company)
-        contact = find_contact(company)
-        if contact:
-            save_contact(company["id"], contact)
+        contact_data = find_contact(company)
+        if contact_data:
+            save_contact(company["id"], contact_data)
             update_company_status(company["id"], "contacted")
             found += 1
         time.sleep(0.5)
@@ -388,3 +389,4 @@ def run(limit=15):
 
 if __name__ == "__main__":
     run()
+

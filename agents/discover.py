@@ -703,8 +703,8 @@ def run(max_new=100) -> list:
 
 
 if __name__ == "__main__":
-    from agents.tracker import init_db
-    init_db()
+    from agents.tracker import verify_connection
+    verify_connection()
     companies = run()
     print(f"\nTop 5 by fit score:")
     for c in companies[:5]:
