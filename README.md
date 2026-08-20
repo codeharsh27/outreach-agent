@@ -291,6 +291,7 @@ Tapping **Edit Email** prompts you to reply with your revised text. The card upd
 
 ---
 
-## License
+If you find Outreach Agent useful, please give it a ⭐ on GitHub!
 
+## License
 MIT. Built by [Harsh Mule](https://github.com/codeharsh27).
