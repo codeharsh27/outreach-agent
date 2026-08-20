@@ -4,7 +4,7 @@ on:
   schedule:
     # Run every Monday through Friday at 08:00 AM UTC
     - cron: '0 8 * * 1-5'
-  workflow_dispatch: # Allows manual trigger from GitHub UI anytime
+  workflow_dispatch: # Manual trigger from GitHub UI anytime
 
 jobs:
   outreach:
@@ -23,15 +23,23 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
-          pip install httpx requests beautifulsoup4 PyGithub python-dotenv google-auth google-auth-oauthlib google-api-python-client openai aiohttp sqlite-utils pytz python-telegram-bot dnspython
+          pip install -r requirements.txt
 
       - name: Run Outreach Pipeline & Push Live Telegram Cards
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GH_PAT_TOKEN || secrets.GITHUB_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GMAIL_SENDER_EMAIL: ${{ secrets.GMAIL_SENDER_EMAIL }}
+          GMAIL_TOKEN_JSON: ${{ secrets.GMAIL_TOKEN_JSON }}
+          YOUR_NAME: ${{ secrets.YOUR_NAME }}
+          USER_ROLE: ${{ secrets.USER_ROLE }}
+          USER_PROJECT_NAME: ${{ secrets.USER_PROJECT_NAME }}
+          USER_PROJECT_DESC: ${{ secrets.USER_PROJECT_DESC }}
+          GITHUB_ACTIONS: "true"
         run: |
-          python3 -m agents.orchestrate run
+          PYTHONPATH=. python3 -m agents.orchestrate run

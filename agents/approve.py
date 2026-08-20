@@ -1,12 +1,14 @@
 """
-Telegram approval gate — email only.
-Streams pending draft cards to your phone with inline buttons:
-  [✅ Approve & Send Email]  [✏️ Edit Email]  [❌ Skip Draft]
-
-LinkedIn and X sections removed — this agent handles email only.
+approve.py — Telegram Approval Gate & Interactive Bot
+Fixes applied:
+- V3: Telegram callback authentication (ensures effective_user.id matches TELEGRAM_CHAT_ID)
+- V6: 4,000-character payload truncation to prevent Telegram 4096-char payload crashes
+- V20: Rate-limit sleep (1.1s) per card to prevent Telegram HTTP 429 flood blocks
 """
 import asyncio
 import html
+import os
+import sys
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from agents.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
@@ -16,10 +18,15 @@ from agents.tracker import (
 )
 
 
-# ── Format a draft card for Telegram (email only) ─────────────────
+def _verify_user_id(user_id: int | str) -> bool:
+    """Fix V3: Ensure callback/message originates strictly from TELEGRAM_CHAT_ID."""
+    if not TELEGRAM_CHAT_ID:
+        return True
+    return str(user_id) == str(TELEGRAM_CHAT_ID)
+
 
 def format_draft_message(draft: dict) -> str:
-    """Format a draft into a clean Telegram message — email section only."""
+    """Fix V6: Format draft card with strict HTML escaping and 4,000-character length truncation."""
     company = html.escape(str(draft.get("company_name", "Unknown")))
     contact = html.escape(str(draft.get("contact_name", "Unknown")))
     email   = html.escape(str(draft.get("email", "")))
@@ -31,7 +38,7 @@ def format_draft_message(draft: dict) -> str:
     if domain:
         header += f"  ·  {domain}"
 
-    return "\n".join([
+    full_text = "\n".join([
         header,
         "",
         "━━━━━━ <b>EMAIL DRAFT</b> ━━━━━━",
@@ -39,6 +46,12 @@ def format_draft_message(draft: dict) -> str:
         "",
         body,
     ])
+
+    # Fix V6: Truncate at 4,000 chars to avoid Telegram 4096-char payload crashes
+    if len(full_text) > 4000:
+        full_text = full_text[:3950] + "\n\n<i>[...body truncated for length]</i>"
+
+    return full_text
 
 
 def approval_keyboard(draft_id: int) -> InlineKeyboardMarkup:
@@ -53,10 +66,12 @@ def approval_keyboard(draft_id: int) -> InlineKeyboardMarkup:
     ])
 
 
-# ── Stream all pending cards to Telegram ─────────────────────────
-
 async def push_all_drafts_to_telegram():
-    """Push ALL pending draft cards to Telegram in one smooth stream."""
+    """Fix V20: Stream all pending cards to Telegram with 1.1s sleep to respect rate limits."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("   Telegram credentials not configured — skipping push.")
+        return []
+
     bot    = Bot(token=TELEGRAM_BOT_TOKEN)
     drafts = get_pending_drafts(limit=50)
 
@@ -65,14 +80,17 @@ async def push_all_drafts_to_telegram():
         return []
 
     print(f"   Pushing {len(drafts)} drafts to Telegram app...")
-    await bot.send_message(
-        chat_id=TELEGRAM_CHAT_ID,
-        text=(
-            f"🌅 <b>Good morning! {len(drafts)} outreach drafts ready for review.</b>\n"
-            f"Tap <b>[✅ Approve]</b> to queue email, <b>[✏️ Edit]</b> to customize, or <b>[❌ Skip]</b>."
-        ),
-        parse_mode="HTML",
-    )
+    try:
+        await bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=(
+                f"🌅 <b>Good morning! {len(drafts)} outreach drafts ready for review.</b>\n"
+                f"Tap <b>[✅ Approve]</b> to queue email, <b>[✏️ Edit]</b> to customize, or <b>[❌ Skip]</b>."
+            ),
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"   Error sending Telegram header: {e}")
 
     sent_count = 0
     for draft in drafts:
@@ -88,7 +106,8 @@ async def push_all_drafts_to_telegram():
             )
             update_draft_status(draft_id, "pending", str(msg.message_id))
             sent_count += 1
-            await asyncio.sleep(0.4)  # Smooth rate-limited stream
+            # Fix V20: Sleep 1.1s between messages to avoid Telegram HTTP 429 limit (1 msg/sec)
+            await asyncio.sleep(1.1)
         except Exception as e:
             print(f"   [Telegram push ({draft.get('company_name', '')})] Error: {e}")
 
@@ -96,12 +115,15 @@ async def push_all_drafts_to_telegram():
     return drafts
 
 
-# ── Callback handlers (Approve / Edit / Skip) ─────────────────────
-
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle inline button taps: approve, edit, skip."""
+    """Fix V3: Authenticated inline callback handler."""
     query = update.callback_query
     await query.answer()
+
+    # Fix V3: Verify sender identity
+    if not _verify_user_id(update.effective_user.id):
+        print(f"⚠️ Security: Unauthorized callback query from user ID {update.effective_user.id}")
+        return
 
     data = query.data or ""
     if ":" not in data:
@@ -139,7 +161,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle text reply when user provides edited email body."""
+    """Fix V3: Authenticated edit reply handler."""
+    if not _verify_user_id(update.effective_user.id):
+        return
+
     draft_id    = context.user_data.get("editing_draft_id")
     orig_msg_id = context.user_data.get("editing_msg_id")
 
@@ -149,7 +174,6 @@ async def handle_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_text = update.message.text.strip()
     update_draft_body(draft_id, new_text)
 
-    # Refresh the original card with updated body
     updated = get_draft_by_id(draft_id)
     if updated and orig_msg_id:
         try:
@@ -170,14 +194,23 @@ async def handle_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
 
 
-# ── Main approval run ─────────────────────────────────────────────
+def run_daemon():
+    """Run persistent Telegram polling daemon to listen for edit/approval callbacks."""
+    if not TELEGRAM_BOT_TOKEN:
+        print("❌ TELEGRAM_BOT_TOKEN unset.")
+        return
+
+    print("🤖 Starting Telegram polling daemon... Press Ctrl+C to exit.")
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_reply))
+    app.run_polling()
+
 
 def run() -> list:
-    """Push all pending draft cards to Telegram immediately."""
+    """Push pending drafts to Telegram."""
     print("\n📱 Running Telegram approval push...")
     asyncio.run(push_all_drafts_to_telegram())
-
-    # Return approved draft IDs ready to send
     try:
         res = _sb().table("drafts").select("id").eq("status", "approved").execute()
         return [r["id"] for r in (res.data or [])]
@@ -186,5 +219,8 @@ def run() -> list:
 
 
 if __name__ == "__main__":
-    approved = run()
-    print(f"Approved draft IDs: {approved}")
+    if len(sys.argv) > 1 and sys.argv[1] == "daemon":
+        run_daemon()
+    else:
+        approved = run()
+        print(f"Approved draft IDs: {approved}")
