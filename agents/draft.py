@@ -55,7 +55,7 @@ VOICE RULES — follow exactly:
 1. Subject line: Plain text, specific technical observation or quote, no quotes around subject, max 12 words.
 2. Email body: 4-6 sentences MAX (<120 words).
    - Opening: What you noticed about their work (specific, not generic). Never start with "I", "My name", "Hope".
-   - Connection: Link their specific problem to what {YOUR_NAME} has built ({USER_PROJECT_NAME}).
+   - Connection: Link their specific problem to what {YOUR_NAME} has built ({USER_PROJECT_NAME}: {USER_PROJECT_DESC}). Reference whichever project (`SideDoor` or `drift-watch`) fits their stack best.
    - Soft Ask: One single genuine technical or intellectual question.
 3. DO NOT add signature lines, "--" dividers, or artificial horizontal bars.
 

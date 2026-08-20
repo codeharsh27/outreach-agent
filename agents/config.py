@@ -52,9 +52,9 @@ LINKEDIN_URL  = os.getenv("LINKEDIN_URL",  "")
 GITHUB_URL    = os.getenv("GITHUB_URL",    "")
 
 # ── Personalization (email drafting voice) ───────────────────────
-USER_ROLE         = os.getenv("USER_ROLE",         "Software Engineer")
-USER_PROJECT_NAME = os.getenv("USER_PROJECT_NAME", "")
-USER_PROJECT_DESC = os.getenv("USER_PROJECT_DESC", "")
+USER_ROLE         = os.getenv("USER_ROLE",         "Product Engineer")
+USER_PROJECT_NAME = os.getenv("USER_PROJECT_NAME", "SideDoor & drift-watch")
+USER_PROJECT_DESC = os.getenv("USER_PROJECT_DESC", "SideDoor surfaces evidenced job opportunities at startups based on real technical evidence, and drift-watch flags silent API schema drift before production.")
 
 # ── Local dirs (Gmail credentials only — DB is now Supabase) ────
 (PROJ / "config").mkdir(parents=True, exist_ok=True)

@@ -43,7 +43,7 @@ Gmail
 |---|---|
 | **Staggered pipeline** | Runs in 15-company micro-batches throughout the day to avoid API rate limits. |
 | **Sub-second drafting** | Google Gemini Flash generates each email in under 300ms. No local GPU needed. |
-| **Personalized voice** | Emails are written in your voice — your name, role, project, and examples from your actual emails. |
+| **Personalized voice** | Emails are written in your voice — your name, role, projects, and email examples. |
 | **Human review gate** | Every email passes through you on Telegram before it sends. |
 | **Live editing** | Tap Edit in Telegram, reply with your changes. The card updates instantly. |
 | **MX verification** | Checks domain mail records before drafting to avoid bounces. |
@@ -55,7 +55,7 @@ Gmail
 
 ## One-Paste Agent Setup
 
-> If you are using an AI coding agent (Claude, Cursor, Antigravity, or similar), copy the prompt below and paste it into your agent. The agent will handle the full setup interactively — checking dependencies, collecting keys, and running the first pipeline batch.
+> If you are using an AI coding agent (Claude, Cursor, Antigravity, or similar), copy the prompt below and paste it into your agent. The agent will handle the full setup interactively — checking dependencies, collecting keys, setting up Supabase, and configuring GitHub Actions.
 
 ```
 You are setting up the Outreach Agent from https://github.com/codeharsh27/outreach-agent.
@@ -86,11 +86,11 @@ d. Gmail address — ask the user for their Gmail address.
 
 Step 4 — Personalization (for cold email voice)
 Ask the user:
-- Your full name?
-- Your role? (e.g. Backend Engineer, Full Stack Developer, ML Engineer)
-- Your main project name?
-- One sentence describing what your project does?
-- Your project URL (optional)?
+- Your full name? (e.g. Harsh Mule)
+- Your role? (e.g. Product Engineer, Backend Engineer, Full Stack Developer)
+- Your main project name(s)? (e.g. SideDoor & drift-watch)
+- One sentence describing what your projects do? (e.g. SideDoor surfaces job opportunities; drift-watch detects API schema drift)
+- Your project URL(s) (optional)?
 - Your portfolio URL (optional)?
 - Your GitHub URL (optional)?
 
@@ -121,6 +121,20 @@ Step 8 — Verify and run first batch
 - Confirm Supabase connected and tables are accessible.
 - Run: PYTHONPATH=. python3 -m agents.orchestrate minibatch
 - Confirm the first 15 companies are discovered, researched, and contacts found.
+
+Step 9 — Configure GitHub Secrets for Autonomous Cloud Execution
+Tell the user to go to their GitHub repository → Settings → Secrets and variables → Actions, and add the following repository secrets:
+- SUPABASE_URL
+- SUPABASE_KEY
+- GEMINI_API_KEY
+- TELEGRAM_BOT_TOKEN
+- TELEGRAM_CHAT_ID
+- GMAIL_SENDER_EMAIL
+- GMAIL_TOKEN_JSON (the contents of ~/outreach-agent/config/token.json as a single raw JSON string)
+- YOUR_NAME
+- USER_ROLE
+- USER_PROJECT_NAME
+- USER_PROJECT_DESC
 
 If any step fails, read the error carefully, fix it, and continue from where it failed.
 ```
@@ -181,14 +195,14 @@ SUPABASE_URL=
 SUPABASE_KEY=
 
 # Your identity (used in email drafts)
-YOUR_NAME=
+YOUR_NAME=Harsh Mule
 YOUR_EMAIL=
-USER_ROLE=
-USER_PROJECT_NAME=
-USER_PROJECT_DESC=
-SIDEDOOR_URL=
-PORTFOLIO_URL=
-GITHUB_URL=
+USER_ROLE=Product Engineer
+USER_PROJECT_NAME=SideDoor & drift-watch
+USER_PROJECT_DESC=SideDoor surfaces evidenced job opportunities; drift-watch detects API schema drift.
+SIDEDOOR_URL=https://sidedoor-chi.vercel.app/
+PORTFOLIO_URL=https://harshmule.vercel.app/
+GITHUB_URL=https://github.com/codeharsh27
 ```
 
 ### Gmail Authentication
@@ -236,20 +250,21 @@ The pipeline runs automatically every weekday at 8:00 AM UTC via [`.github/workf
 
 Add these secrets to your GitHub repository under **Settings → Secrets and variables → Actions**:
 
-| Secret | Description |
+| Secret Name | Description / Example Value |
 |---|---|
-| `GEMINI_API_KEY` | Google AI Studio key |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token |
-| `TELEGRAM_CHAT_ID` | Your Telegram chat ID |
-| `GMAIL_SENDER_EMAIL` | Your Gmail address |
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_KEY` | Your Supabase anon key |
-| `YOUR_NAME` | Your full name |
-| `USER_ROLE` | Your role (e.g. Backend Engineer) |
-| `USER_PROJECT_NAME` | Your project name |
-| `USER_PROJECT_DESC` | One sentence about your project |
+| `SUPABASE_URL` | `https://idbqrcmrohvwhgfwhqhw.supabase.co` |
+| `SUPABASE_KEY` | Supabase anon key starting with `eyJ...` |
+| `GEMINI_API_KEY` | Google AI Studio API key |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather |
+| `TELEGRAM_CHAT_ID` | Your numeric Telegram chat ID |
+| `GMAIL_SENDER_EMAIL` | `harshmude27@gmail.com` |
+| `GMAIL_TOKEN_JSON` | Raw content of `config/token.json` as a single JSON string |
+| `YOUR_NAME` | `Harsh Mule` |
+| `USER_ROLE` | `Product Engineer` |
+| `USER_PROJECT_NAME` | `SideDoor & drift-watch` |
+| `USER_PROJECT_DESC` | `SideDoor surfaces job opportunities; drift-watch detects API schema drift.` |
 
-Once secrets are set, the pipeline runs in the cloud. Your laptop can be off.
+Once secrets are set, the pipeline runs 100% autonomously in the cloud. Your laptop can be off.
 
 ---
 
