@@ -56,6 +56,12 @@ USER_ROLE         = os.getenv("USER_ROLE",         "Product Engineer")
 USER_PROJECT_NAME = os.getenv("USER_PROJECT_NAME", "SideDoor & drift-watch")
 USER_PROJECT_DESC = os.getenv("USER_PROJECT_DESC", "SideDoor surfaces evidenced job opportunities at startups based on real technical evidence, and drift-watch flags silent API schema drift before production.")
 
+DEFAULT_SIGNATURE_MARKDOWN = (
+    "Harsh Mule\n"
+    "Building [SideDoor](https://sidedoor-chi.vercel.app/) | [Portfolio](https://harshmule.vercel.app/)\n"
+    "Socials: [X](https://x.com/codeharsh27) | [LinkedIn](https://www.linkedin.com/in/harshmule27/) | [Github](https://github.com/codeharsh27)"
+)
+
 # ── Local dirs (Gmail credentials only — DB is now Supabase) ────
 (PROJ / "config").mkdir(parents=True, exist_ok=True)
 

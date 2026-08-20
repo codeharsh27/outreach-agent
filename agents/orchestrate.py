@@ -130,13 +130,25 @@ def run_morning_push():
         send.run(approved_ids)
 
 
+def clear_stale_drafts():
+    """Wipe all pending/drafted_ready test drafts from Supabase."""
+    verify_connection()
+    try:
+        res = _sb().table("drafts").delete().in_("status", ["pending", "drafted_ready"]).execute()
+        deleted = len(res.data or [])
+        print(f"🧹 Cleared {deleted} stale test drafts from Supabase!")
+    except Exception as e:
+        print(f"❌ Error clearing drafts: {e}")
+
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Outreach Agent Orchestrator")
     parser.add_argument(
         "command", nargs="?", default="run",
         choices=["run", "discover", "research", "draft", "contact",
-                 "minibatch", "draft_night", "morning_push", "stats", "test"],
+                 "minibatch", "draft_night", "morning_push", "stats", "test", "clear_drafts"],
         help="Command to run",
     )
     args = parser.parse_args()
@@ -152,6 +164,8 @@ if __name__ == "__main__":
         run_draft_night()
     elif args.command == "morning_push":
         run_morning_push()
+    elif args.command == "clear_drafts":
+        clear_stale_drafts()
     elif args.command == "discover":
         verify_connection()
         discover.run(max_new=200)
@@ -167,3 +181,4 @@ if __name__ == "__main__":
     elif args.command == "stats":
         verify_connection()
         print_stats()
+

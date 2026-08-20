@@ -199,6 +199,15 @@ def get_pending_drafts(limit: int = 50) -> list:
             flat = dict(r)
             co = flat.pop("companies", {}) or {}
             ct = flat.pop("contacts", {}) or {}
+            if isinstance(co, list) and co:
+                co = co[0]
+            if isinstance(ct, list) and ct:
+                ct = ct[0]
+            if not isinstance(co, dict):
+                co = {}
+            if not isinstance(ct, dict):
+                ct = {}
+
             flat["company_name"] = co.get("name", "Unknown")
             flat["domain"]       = co.get("domain", "")
             flat["contact_name"] = ct.get("name", "Team")
@@ -246,6 +255,15 @@ def get_draft_by_id(draft_id: int) -> dict | None:
         flat = dict(r)
         co = flat.pop("companies", {}) or {}
         ct = flat.pop("contacts", {}) or {}
+        if isinstance(co, list) and co:
+            co = co[0]
+        if isinstance(ct, list) and ct:
+            ct = ct[0]
+        if not isinstance(co, dict):
+            co = {}
+        if not isinstance(ct, dict):
+            ct = {}
+
         flat["company_name"] = co.get("name", "")
         flat["domain"]       = co.get("domain", "")
         flat["contact_name"] = ct.get("name", "")
@@ -254,6 +272,7 @@ def get_draft_by_id(draft_id: int) -> dict | None:
     except Exception as e:
         print(f"  [tracker] get_draft_by_id error: {e}")
         return None
+
 
 
 # ── Send helpers ──────────────────────────────────────────────────

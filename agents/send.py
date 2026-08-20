@@ -103,10 +103,17 @@ def build_email(to: str, subject: str, body: str, signature_html: str = "") -> d
             html_paragraphs_list.append(f"<p>{p_clean}</p>")
     html_paragraphs = "".join(html_paragraphs_list)
 
-    if signature_html:
-        html_content = f"<div>{html_paragraphs}</div><br><div>{signature_html}</div>"
-    else:
-        html_content = f"<div>{html_paragraphs}</div>"
+    from agents.config import DEFAULT_SIGNATURE_MARKDOWN
+
+    if not signature_html:
+        # Convert signature markdown links [text](url) to HTML <a href="url">text</a>
+        sig_html_lines = []
+        for line in DEFAULT_SIGNATURE_MARKDOWN.strip().split("\n"):
+            line_html = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', line)
+            sig_html_lines.append(line_html)
+        signature_html = "<br>".join(sig_html_lines)
+
+    html_content = f"<div>{html_paragraphs}</div><br><br><div>{signature_html}</div>"
 
     plain_body = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", body)
 
