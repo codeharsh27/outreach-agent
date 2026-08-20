@@ -37,6 +37,10 @@ I have built drift-watch for a similar problem at Oximy(YC26) - diffs vendor API
 
 Worth pointing it at a couple of your provider pairs? Or if this is already solved internally, genuinely curious how.
 
+Harsh Mule
+Building [SideDoor](https://sidedoor-chi.vercel.app/) | [Portfolio](https://harshmule.vercel.app/)
+Socials: [X](https://x.com/codeharsh27) | [LinkedIn](https://www.linkedin.com/in/harshmule27/) | [Github](https://github.com/codeharsh27)
+
 EXAMPLE 2:
 Subject: "Most intent data is noise" - what's actually driving signal at OrbitShift.ai then?
 Body:
@@ -48,6 +52,10 @@ Genuinely curious: if intent data's mostly noise, what's the actual signal you t
 
 I've been chewing on the same tradeoff building SideDoor - matches candidates to real evidence instead of resume spam. Would value your take if you have two minutes.
 
+Harsh Mule
+Building [SideDoor](https://sidedoor-chi.vercel.app/) | [Portfolio](https://harshmule.vercel.app/)
+Socials: [X](https://x.com/codeharsh27) | [LinkedIn](https://www.linkedin.com/in/harshmule27/) | [Github](https://github.com/codeharsh27)
+
 EXAMPLE 3:
 Subject: Neil, one thing about Intangles is hard to fake
 Body:
@@ -58,6 +66,10 @@ What I find interesting about Intangles is that the data doesn't stay on a dashb
 I've been thinking about this while building SideDoor. I started with the same question from a different angle: can you find the real problem before you start building the solution? I'm looking for somewhere I can contribute to problems with that kind of consequence.
 
 If there's a product or engineering problem at Intangles where an extra pair of hands could actually move it forward, I'd love to take a shot at it.
+
+Harsh Mule
+Building [SideDoor](https://sidedoor-chi.vercel.app/) | [Portfolio](https://harshmule.vercel.app/)
+Socials: [X](https://x.com/codeharsh27) | [LinkedIn](https://www.linkedin.com/in/harshmule27/) | [Github](https://github.com/codeharsh27)
 """
 
 # ── System prompt with structural injection protection ───────────
@@ -85,11 +97,15 @@ Paragraph 3 (The Low-Friction Ask / Offer):
 - 1-2 sentences with a soft, genuine technical question or offer to contribute.
 - Examples: "Worth pointing it at a couple of your provider pairs? Or if this is already solved internally, genuinely curious how.", "Would value your take if you have two minutes.", or "If there's a product or engineering problem at [Company] where an extra pair of hands could move it forward, I'd love to take a shot."
 
+Signature (Always include 1-2 blank lines after Paragraph 3):
+Harsh Mule
+Building [SideDoor](https://sidedoor-chi.vercel.app/) | [Portfolio](https://harshmule.vercel.app/)
+Socials: [X](https://x.com/codeharsh27) | [LinkedIn](https://www.linkedin.com/in/harshmule27/) | [Github](https://github.com/codeharsh27)
+
 Formatting:
-- Length: 120-160 words total across 3 distinct paragraphs.
+- Length: Do NOT shorten the email too much! Match the natural length of the 3 examples (130-170 words total across 3 distinct paragraphs + signature).
 - Tone: Thoughtful, elite Product Engineer speaking peer-to-peer with a CTO/founder.
 - Absolutely NO generic AI jargon (delve, leverage, testament, synergy, game-changer, seamless, cutting-edge).
-- Absolutely NO signature lines or "--" dividers in the email body.
 
 Here are the 3 exact real emails to emulate:
 {FEW_SHOT_EXAMPLES}
@@ -97,8 +113,9 @@ Here are the 3 exact real emails to emulate:
 Output ONLY valid JSON:
 {{
   "email_subject": "...",
-  "email_body": "Hi [Name],\\n\\n[Paragraph 1]\\n\\n[Paragraph 2]\\n\\n[Paragraph 3]"
+  "email_body": "Hi [Name],\\n\\n[Paragraph 1]\\n\\n[Paragraph 2]\\n\\n[Paragraph 3]\\n\\nHarsh Mule\\nBuilding [SideDoor](https://sidedoor-chi.vercel.app/) | [Portfolio](https://harshmule.vercel.app/)\\nSocials: [X](https://x.com/codeharsh27) | [LinkedIn](https://www.linkedin.com/in/harshmule27/) | [Github](https://github.com/codeharsh27)"
 }}"""
+
 
 
 

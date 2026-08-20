@@ -8,7 +8,9 @@ Fixes applied:
 import asyncio
 import html
 import os
+import re
 import sys
+
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from agents.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
@@ -32,7 +34,11 @@ def format_draft_message(draft: dict) -> str:
     email   = html.escape(str(draft.get("email", "")))
     domain  = html.escape(str(draft.get("domain", "")))
     subject = html.escape(str(draft.get("email_subject", "")))
-    body    = html.escape(str(draft.get("email_body", "")))
+    
+    body_raw = str(draft.get("email_body", ""))
+    body_escaped = html.escape(body_raw)
+    # Convert markdown links [text](url) to Telegram HTML <a href="url">text</a>
+    body = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', body_escaped)
 
     header = f"🏢 <b>{company}</b>  ·  {contact}\n📧 {email}"
     if domain:
@@ -47,11 +53,11 @@ def format_draft_message(draft: dict) -> str:
         body,
     ])
 
-    # Fix V6: Truncate at 4,000 chars to avoid Telegram 4096-char payload crashes
     if len(full_text) > 4000:
         full_text = full_text[:3950] + "\n\n<i>[...body truncated for length]</i>"
 
     return full_text
+
 
 
 def approval_keyboard(draft_id: int) -> InlineKeyboardMarkup:
